@@ -159,11 +159,25 @@ class PlayerB(pygame.sprite.Sprite):
 # The bottom line is at least they shouldn't collide with each other.
 # You may try different strategies (e.g. reactive, heuristic, learning, etc).
 
-def get_distance(a: tuple[int, int], b: tuple[int, int]) -> int:
-    return int(math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2))
 
-class ReactiveA(pygame.sprite.Sprite):
-    def __init__(self):
+def get_distance(a: tuple[int, int], b: tuple[int, int]) -> float:
+    """Return the two norm distance between two points.
+
+    Left as a float to devalue diagonal moves.
+    """
+    return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+
+
+class PlayerReactivePartJiggle(pygame.sprite.Sprite):
+    """Defines a Reactive, Partitioned, Jiggly agent.
+
+    The agent is reactive in pursuing the closest coin.
+    The agent is partitioned in its responsibilities (top/bottom of map).
+    The agent jiggles when stuck. If its path is blocked, it will move in a random direction.
+    """
+
+    def __init__(self, is_top: bool):
+        """Initialize the agent."""
         pygame.sprite.Sprite.__init__(self)
         self.image = sonic_img
         self.image = pygame.transform.scale(sonic_img, (WALLSIZE, WALLSIZE))
@@ -179,9 +193,13 @@ class ReactiveA(pygame.sprite.Sprite):
         self.score = 0
         self.steps = 0
 
-        self.wall_pos = [(wall[0] // self.speedx, wall[1] // self.speedy) for wall in get_wall_data()]
+        self.is_top = is_top
+        self.wall_pos = [
+            (wall[0] // self.speedx, wall[1] // self.speedy) for wall in get_wall_data()
+        ]
 
     def move(self, direction):
+        """Translate movement intention into a change in position."""
         if direction == "r":
             self.steps += 1
             self.rect.x += self.speedx
@@ -214,55 +232,37 @@ class ReactiveA(pygame.sprite.Sprite):
             self.rect.top = 0
 
     def is_player_collide_wall(self):
+        """Determine wall collision state."""
         for wall in walls:
             if self.rect.colliderect(wall):
                 return True
         return False
 
     def update(self):
-        if self.rect.y / HEIGHT > 0.5:
-            self.move("u")
+        """Implement agent's reactive logic.
 
-        targets = []
-        coin_values, coin_pos = get_coin_data()
-        for coin in coins:
-            if coin.rect.y / HEIGHT > 0.5:
-                continue
-            pos = (coin.rect.y // self.speedy, coin.rect.x // self.speedx)
-            dist = get_distance((self.rect.y / self.speedy, self.rect.x / self.speedx), (pos[0], pos[1]))
-            heapq.heappush(targets, (dist, coin.value, (pos[0], pos[1])))
+        All coin locations are placed into a priority queue based on
+        distance to the agent, with coin value as a tie breaker. We pop
+        an item off the queue to get the goal coin and move accordingly.
 
-        if targets:
-            goal = heapq.heappop(targets)
-            rel_up_down = goal[2][0] - self.rect.y // self.speedy
-            rel_left_right = goal[2][1] - self.rect.x // self.speedx
-
-            if rel_left_right > 0 and (self.rect.x // self.speedx + 1, self.rect.y // self.speedy) not in self.wall_pos:
-                self.move("r")
-            elif rel_left_right < 0 and (self.rect.x // self.speedx - 1, self.rect.y // self.speedy) not in self.wall_pos:
-                self.move("l")
-            elif rel_up_down > 0 and (self.rect.x // self.speedx, self.rect.y // self.speedy + 1) not in self.wall_pos:
-                self.move("d")
-            elif rel_up_down < 0 and (self.rect.x // self.speedx, self.rect.y // self.speedy - 1) not in self.wall_pos:
-                self.move("u")
-            else:
-                self.move(random.choice(["r", "l", "u", "d"]))
-
-class ReactiveB(ReactiveA):
-    def __init__(self):
-        super().__init__()
-
-    def update(self):
-        if self.rect.y / HEIGHT < 0.5:
+        If the agent is stuck, we move in a random direction.
+        """
+        if self.rect.y / HEIGHT < 0.5 and not self.is_top:
             self.move("d")
+            return
 
-        targets = []
+        targets: list[tuple[float, int, tuple[int, int]]] = []
         coin_values, coin_pos = get_coin_data()
         for coin in coins:
-            if coin.rect.y / HEIGHT < 0.5:
-                continue
+            match (coin.rect.y / HEIGHT > 0.5, self.is_top):
+                case (True, True):
+                    continue
+                case (False, False):
+                    continue
             pos = (coin.rect.y // self.speedy, coin.rect.x // self.speedx)
-            dist = get_distance((self.rect.y / self.speedy, self.rect.x / self.speedx), (pos[0], pos[1]))
+            dist = get_distance(
+                (self.rect.y / self.speedy, self.rect.x / self.speedx), (pos[0], pos[1])
+            )
             heapq.heappush(targets, (dist, coin.value, (pos[0], pos[1])))
 
         if targets:
@@ -270,13 +270,32 @@ class ReactiveB(ReactiveA):
             rel_up_down = goal[2][0] - self.rect.y // self.speedy
             rel_left_right = goal[2][1] - self.rect.x // self.speedx
 
-            if rel_left_right > 0 and (self.rect.x // self.speedx + 1, self.rect.y // self.speedy) not in self.wall_pos:
+            if (
+                rel_left_right > 0
+                and (self.rect.x // self.speedx + 1, self.rect.y // self.speedy)
+                not in self.wall_pos
+            ):
                 self.move("r")
-            elif rel_left_right < 0 and (self.rect.x // self.speedx - 1, self.rect.y // self.speedy) not in self.wall_pos:
+            elif (
+                rel_left_right < 0
+                and (
+                    self.rect.x // self.speedx - 1,
+                    self.rect.y // self.speedy,
+                )
+                not in self.wall_pos
+            ):
                 self.move("l")
-            elif rel_up_down > 0 and (self.rect.x // self.speedx, self.rect.y // self.speedy + 1) not in self.wall_pos:
+            elif (
+                rel_up_down > 0
+                and (self.rect.x // self.speedx, self.rect.y // self.speedy + 1)
+                not in self.wall_pos
+            ):
                 self.move("d")
-            elif rel_up_down < 0 and (self.rect.x // self.speedx, self.rect.y // self.speedy - 1) not in self.wall_pos:
+            elif (
+                rel_up_down < 0
+                and (self.rect.x // self.speedx, self.rect.y // self.speedy - 1)
+                not in self.wall_pos
+            ):
                 self.move("u")
             else:
                 self.move(random.choice(["r", "l", "u", "d"]))

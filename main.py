@@ -13,8 +13,8 @@ elif case == 2: # Test if your agent is rational
     player1 = randPlayer(randAgentPath, BLUE)
     player2 = ReactiveA()
 elif case == 3: # Test if your agents cooperate with each other
-    player1 = ReactiveA()
-    player2 = ReactiveB()
+    player1 = PlayerReactivePartJiggle(True)
+    player2 = PlayerReactivePartJiggle(False)
 
 all_sprites.add(player1)
 all_sprites.add(player2)
