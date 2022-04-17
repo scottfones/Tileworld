@@ -11,7 +11,7 @@ elif case == 1: # Base Case
     player2 = randPlayer(randAgentPath1, YELLOW)
 elif case == 2: # Test if your agent is rational
     player1 = randPlayer(randAgentPath, BLUE)
-    player2 = ReactiveA()
+    player2 = PlayerReactivePartJiggle(True)
 elif case == 3: # Test if your agents cooperate with each other
     player1 = PlayerReactivePartJiggle(True)
     player2 = PlayerReactivePartJiggle(False)
