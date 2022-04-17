@@ -7,8 +7,7 @@ parser = argparse.ArgumentParser(
     description="stats for your tileworld runs",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-
-parser.add_argument('-r', '--runs', type=int, default=10)
+parser.add_argument("-r", "--runs", type=int, default=10)
 args = parser.parse_args()
 
 p1_scores = []
@@ -37,22 +36,22 @@ for run_num in range(args.runs):
 print("\nSummary:")
 
 print(f"Player 1 Scores:")
-print(f'  Scores: {p1_scores}')
-print(f'  Sorted: {sorted(p1_scores)}')
+print(f"  Scores: {p1_scores}")
+print(f"  Sorted: {sorted(p1_scores)}")
 print(f"  Mean: {statistics.mean(p1_scores)}")
 print(f"  Median: {statistics.median(p1_scores)}")
 print(f"  Std Dev: {statistics.stdev(p1_scores)}")
 
 print(f"Player 2 Scores:")
-print(f'  Scores: {p2_scores}')
-print(f'  Sorted: {sorted(p2_scores)}')
+print(f"  Scores: {p2_scores}")
+print(f"  Sorted: {sorted(p2_scores)}")
 print(f"  Mean: {statistics.mean(p2_scores)}")
 print(f"  Median: {statistics.median(p2_scores)}")
 print(f"  Std Dev: {statistics.stdev(p2_scores)}")
 
 print(f"Total Scores:")
-print(f'  Scores: {t_scores}')
-print(f'  Sorted: {sorted(t_scores)}')
+print(f"  Scores: {t_scores}")
+print(f"  Sorted: {sorted(t_scores)}")
 print(f"  Mean: {statistics.mean(t_scores)}")
 print(f"  Median: {statistics.median(t_scores)}")
 print(f"  Std Dev: {statistics.stdev(t_scores)}")
