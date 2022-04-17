@@ -129,6 +129,6 @@ def get_coin_data():
 
 def get_wall_data():
     cur_wall_poss = []
-    for coin in coins:
+    for wall in walls:
         cur_wall_poss.append([wall.rect.x, wall.rect.y])
     return cur_wall_poss
