@@ -2,7 +2,7 @@ from demoAgent import demoPlayer
 from randomAgent import randPlayer
 from coopAgent import *
 
-case = 1
+case = 3
 if case == 0:  # Play with this case to get an idea of the environment
     player1 = demoPlayer()
     player2 = randPlayer(randAgentPath, BLUE)
@@ -11,10 +11,10 @@ elif case == 1: # Base Case
     player2 = randPlayer(randAgentPath1, YELLOW)
 elif case == 2: # Test if your agent is rational
     player1 = randPlayer(randAgentPath, BLUE)
-    player2 = PlayerA()
+    player2 = ReactiveA()
 elif case == 3: # Test if your agents cooperate with each other
-    player1 = PlayerA()
-    player2 = PlayerB()
+    player1 = ReactiveA()
+    player2 = ReactiveB()
 
 all_sprites.add(player1)
 all_sprites.add(player2)
