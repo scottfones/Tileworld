@@ -2,6 +2,9 @@ from demoAgent import demoPlayer
 from randomAgent import randPlayer
 from coopAgent import *
 
+player1: pygame.sprite.Sprite
+player2: pygame.sprite.Sprite
+
 case = 3
 if case == 0:  # Play with this case to get an idea of the environment
     player1 = demoPlayer()

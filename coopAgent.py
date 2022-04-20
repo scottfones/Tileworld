@@ -1,4 +1,6 @@
+"""User defined players."""
 from enum import Enum, unique
+
 from env import *
 
 import heapq
@@ -20,7 +22,7 @@ class PlayerA(pygame.sprite.Sprite):
         pygame.draw.rect(
             self.image, rand_color(random.randint(0, N)), self.image.get_rect(), 3
         )
-        self.rect = self.image.get_rect()  # get image position
+        self.rect: pygame.rect.Rect = self.image.get_rect()  # get image position
         self.rect.x = 0
         self.rect.y = 0
         self.speedx = SPEED
@@ -51,7 +53,7 @@ class PlayerA(pygame.sprite.Sprite):
                 self.rect.y -= self.speedy
 
     def is_player_collide_wall(self):
-        for wall in walls:
+        for wall in get_wall_data():
             if self.rect.colliderect(wall):
                 return True
         return False
@@ -96,7 +98,7 @@ class PlayerB(pygame.sprite.Sprite):
         pygame.draw.rect(
             self.image, rand_color(random.randint(0, N)), self.image.get_rect(), 3
         )
-        self.rect = self.image.get_rect()  # get image position
+        self.rect: pygame.rect.Rect = self.image.get_rect()  # get image position
         self.rect.x = 0
         self.rect.y = 0
         self.speedx = SPEED
@@ -163,18 +165,27 @@ class PlayerB(pygame.sprite.Sprite):
 
 @unique
 class Movement(Enum):
+    """Movement enum to represent the direction of the agent."""
+
     UP = (0, -1)
     DOWN = (0, 1)
     LEFT = (-1, 0)
     RIGHT = (1, 0)
 
 
-def get_distance(a: tuple[int, int], b: tuple[int, int]) -> float:
-    """Return the two norm distance between two points.
+def get_distance(a: tuple[int, int], b: tuple[int, int], m_type: str) -> float:
+    """Return the distance between a and b Distance.
 
-    Left as a float to devalue diagonal moves.
+    Type:
+        "e": Euclidean Distance
+        "m": Manhattan Distance
     """
-    return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+    match m_type:
+        case "e":
+            return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+        case "m":
+            return abs(a[0] - b[0]) + abs(a[1] - b[1])
+    return -1
 
 
 class PlayerReactivePartJiggle(pygame.sprite.Sprite):
@@ -194,7 +205,7 @@ class PlayerReactivePartJiggle(pygame.sprite.Sprite):
         pygame.draw.rect(
             self.image, rand_color(random.randint(0, N)), self.image.get_rect(), 1
         )
-        self.rect = self.image.get_rect()  # get image position
+        self.rect: pygame.rect.Rect = self.image.get_rect()  # get image position
         self.rect.x = 0
         self.rect.y = 0
         self.speedx = SPEED
@@ -242,11 +253,12 @@ class PlayerReactivePartJiggle(pygame.sprite.Sprite):
     def is_player_collide_wall(self):
         """Determine wall collision state."""
         for wall in walls:
-            if self.rect.colliderect(wall):
+            if self.rect.colliderect(wall):  # type: ignore
                 return True
         return False
 
     def _is_move_blocked(self, mov_dir: Movement) -> bool:
+        """Determine if a movement would be blocked."""
         next_pos = (
             self.my_pos[0] + mov_dir.value[0],
             self.my_pos[1] + mov_dir.value[1],
@@ -272,20 +284,24 @@ class PlayerReactivePartJiggle(pygame.sprite.Sprite):
 
         targets: list[tuple[float, int, tuple[int, int]]] = []
         coin_values, coin_pos = get_coin_data()
-        for coin in coins:
-            match (coin.rect.y / HEIGHT > 0.5, self.is_top):
+        for (c_val, c_loc) in zip(coin_values, coin_pos):
+
+            match (c_loc[1] / HEIGHT > 0.5, self.is_top):
                 case (True, True):
                     continue
                 case (False, False):
                     continue
-            pos = (coin.rect.y // self.speedy, coin.rect.x // self.speedx)
+            pos = (c_loc[1] // self.speedy, c_loc[0] // self.speedx)
             dist = get_distance(
-                (self.rect.y / self.speedy, self.rect.x / self.speedx), (pos[0], pos[1])
+                (self.rect.y // self.speedy, self.rect.x // self.speedx),
+                (pos[0], pos[1]),
+                "e",
             )
-            heapq.heappush(targets, (dist, coin.value, (pos[0], pos[1])))
+            heapq.heappush(targets, (dist, 9 - c_val, (pos[0], pos[1])))
 
         if targets:
             goal = heapq.heappop(targets)
+
             rel_up_down = goal[2][0] - self.rect.y // self.speedy
             rel_left_right = goal[2][1] - self.rect.x // self.speedx
 
@@ -307,35 +323,102 @@ class PlayerReactivePartJiggle(pygame.sprite.Sprite):
                 )
                 self.move(next_move)
 
+class PlayerHybridPartPath(pygame.sprite.Sprite):
+    """Defines a Hybrid, Partitioned, Pathfinding agent.
 
-class PlayerReactivePartPath(PlayerReactivePartJiggle):
-    """Defines a Reactive, Partitioned, Pathfinding agent.
-
-    The agent is reactive in pursuing the closest coin.
+    The agent is hybrid in pursuing the best coin.
     The agent is partitioned in its responsibilities (top/bottom of map).
     The agent uses a pathfinding algorithm to move to the closest coin.
     """
 
-    def __init__(self, is_top: bool):
+    p_top_pos: tuple[int, int] = (-1, -1)
+    p_bot_pos: tuple[int, int] = (-1, -1)
+
+    def __init__(self, is_alpha: bool):
         """Initialize the agent."""
-        super().__init__(is_top)
+        pygame.sprite.Sprite.__init__(self)
+        self.image = sonic_img
+        self.image = pygame.transform.scale(sonic_img, (WALLSIZE, WALLSIZE))
+        self.image.set_colorkey(BLACK)
+        pygame.draw.rect(
+            self.image, rand_color(random.randint(0, N)), self.image.get_rect(), 1
+        )
+        self.rect: pygame.rect.Rect = self.image.get_rect()  # get image position
+        self.rect.x = 0
+        self.rect.y = 0
+        self.speedx = SPEED
+        self.speedy = SPEED
+        self.score = 0
+        self.steps = 0
+
+        self.is_alpha = is_alpha
+        self.my_pos = (0, 0)
+        self.wall_pos = [
+            (wall[0] // self.speedx, wall[1] // self.speedy) for wall in get_wall_data()
+        ]
+
+    def move(self, direction):
+        """Translate movement intention into a change in position."""
+        self.steps += 1
+        match direction:
+            case Movement.RIGHT:
+                self.rect.x += self.speedx
+                if self.is_player_collide_wall():
+                    self.rect.x -= self.speedx
+            case Movement.LEFT:
+                self.rect.x -= self.speedx
+                if self.is_player_collide_wall():
+                    self.rect.x += self.speedx
+            case Movement.UP:
+                self.rect.y -= self.speedy
+                if self.is_player_collide_wall():
+                    self.rect.y += self.speedy
+            case Movement.DOWN:
+                self.rect.y += self.speedy
+                if self.is_player_collide_wall():
+                    self.rect.y -= self.speedy
+
+        # Avoid colliding with wall and go out of edges
+        if self.rect.right > WIDTH:
+            self.rect.right = WIDTH
+        if self.rect.left < 0:
+            self.rect.left = 0
+        if self.rect.bottom > HEIGHT:
+            self.rect.bottom = HEIGHT
+        if self.rect.top < 0:
+            self.rect.top = 0
+
+    def is_player_collide_wall(self):
+        """Determine wall collision state."""
+        for wall in walls:
+            if self.rect.colliderect(wall):  # type: ignore
+                return True
+        return False
+
+    def _is_move_blocked(self, mov_dir: Movement) -> bool:
+        """Determine if a movement would be blocked."""
+        next_pos = (
+            self.my_pos[0] + mov_dir.value[0],
+            self.my_pos[1] + mov_dir.value[1],
+        )
+        if next_pos in self.wall_pos:
+            return True
+        return False
 
     def update(self):
-        """Implement agent's reactive logic.
-
-        All coin locations are placed into a priority queue based on
-        distance to the agent, with coin value as a tie breaker. We pop
-        an item off the queue to get the goal coin and move accordingly.
-
-        If the agent is stuck, we move in a random direction.
-        """
-        if self.rect.y / HEIGHT < 0.5 and not self.is_top:
+        """Implement agent's hybrid logic."""
+        if self.rect.y / HEIGHT < 0.5 and not self.is_alpha:
             self.move("d")
             return
 
         self.my_pos = (self.rect.x // self.speedx, self.rect.y // self.speedy)
 
         goal = None
-        while goal == None:
-            for dir in ["u", "d", "l", "r"]:
+        while goal is None:
+            for mov in ["u", "d", "l", "r"]:
                 pass
+
+        if self.is_alpha:
+            PlayerHybridPartPath.p_top_pos = self.my_pos
+        else:
+            PlayerHybridPartPath.p_bot_pos = self.my_pos
