@@ -176,7 +176,7 @@ class Movement(Enum):
 def get_distance(a: tuple[int, int], b: tuple[int, int], m_type: str) -> float:
     """Return the distance between a and b Distance.
 
-    Type:
+    m_type:
         "e": Euclidean Distance
         "m": Manhattan Distance
     """
@@ -352,7 +352,9 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
         self.steps = 0
 
         self.is_alpha = is_alpha
+        self.is_init_sep = True
         self.my_pos = (0, 0)
+        self.path = None
         self.wall_pos = [
             (wall[0] // self.speedx, wall[1] // self.speedy) for wall in get_wall_data()
         ]
@@ -407,18 +409,93 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
 
     def update(self):
         """Implement agent's hybrid logic."""
-        if self.rect.y / HEIGHT < 0.5 and not self.is_alpha:
-            self.move("d")
-            return
+        if self.is_init_sep:
+            match self.is_alpha:
+                case True if self.rect.x / WIDTH < 0.5:
+                    self.move(Movement.RIGHT)
+                    return
+                case True:
+                    self.is_init_sep = False
+                case False if self.rect.y / HEIGHT < 0.5:
+                    self.move(Movement.DOWN)
+                    return
+                case False:
+                    self.is_init_sep = False
 
         self.my_pos = (self.rect.x // self.speedx, self.rect.y // self.speedy)
 
-        goal = None
-        while goal is None:
-            for mov in ["u", "d", "l", "r"]:
-                pass
+        coin_vals, coin_pos = get_coin_data()
+        self.coin_pos = []
+        for c_val, c_loc in zip(coin_vals, coin_pos):
+            if self.is_alpha and c_loc[1] / HEIGHT < 0.5:
+                self.coin_pos.append((c_loc[0] // self.speedx, c_loc[1] //self.speedy))
+            elif not self.is_alpha and c_loc[1] / HEIGHT > 0.5:
+                self.coin_pos.append((c_loc[0] // self.speedx, c_loc[1] //self.speedy))
+
+        if not self.path or self.path[0] not in self.coin_pos:
+            visited, next_pos = self.find_path()
+
+            self.path = [next_pos]
+            while next_pos != self.my_pos:
+                next_pos = visited[next_pos]
+                self.path.append(next_pos)
+
+
+        cmp_pos = self.path.pop()
+        rel_x = cmp_pos[0] - self.my_pos[0]
+        rel_y = cmp_pos[1] - self.my_pos[1]
+        match (rel_x, rel_y):
+            case (1, 0):
+                self.move(Movement.RIGHT)
+            case (-1, 0):
+                self.move(Movement.LEFT)
+            case (0, 1):
+                self.move(Movement.DOWN)
+            case (0, -1):
+                self.move(Movement.UP)
 
         if self.is_alpha:
             PlayerHybridPartPath.p_top_pos = self.my_pos
         else:
             PlayerHybridPartPath.p_bot_pos = self.my_pos
+
+
+    def find_path(self):
+        frontier = []
+        visited = {}
+
+        # frontier: (priority, current_pos, prev_pos)
+        heapq.heappush(frontier, (0, self.my_pos, self.my_pos))
+        # Get the path to the closest coin
+        while frontier:
+            current = heapq.heappop(frontier)
+
+            for mov_dir in Movement:
+                next_pos = (
+                    current[1][0] + mov_dir.value[0],
+                    current[1][1] + mov_dir.value[1],
+                )
+                if -1 in next_pos:
+                    continue
+                if next_pos[0] > WIDTH // self.speedx or next_pos[1] > HEIGHT // self.speedy:
+                    continue
+
+                if next_pos in visited.values():
+                    continue
+                if next_pos in self.wall_pos:
+                    continue
+                if next_pos in self.coin_pos:
+                    visited[next_pos] = current[1]
+                    return visited, next_pos
+
+                heapq.heappush(
+                    frontier,
+                    (
+                        current[0] + 1,
+                        next_pos,
+                        current[1],
+                    ),
+                )
+                visited[next_pos] = current[1]
+
+        return visited, self.my_pos
