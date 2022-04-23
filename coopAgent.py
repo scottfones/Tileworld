@@ -323,6 +323,7 @@ class PlayerReactivePartJiggle(pygame.sprite.Sprite):
                 )
                 self.move(next_move)
 
+
 class PlayerHybridPartPath(pygame.sprite.Sprite):
     """Defines a Hybrid, Partitioned, Pathfinding agent.
 
@@ -331,10 +332,15 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
     The agent uses a pathfinding algorithm to move to the closest coin.
     """
 
+    is_init_sep: bool = True
+
     p_top_pos: tuple[int, int] = (-1, -1)
     p_bot_pos: tuple[int, int] = (-1, -1)
 
-    def __init__(self, is_alpha: bool):
+    coin_pos: list[tuple[int, int]] = []
+    wall_pos: list[tuple[int, int]]
+
+    def __init__(self, is_top: bool):
         """Initialize the agent."""
         pygame.sprite.Sprite.__init__(self)
         self.image = sonic_img
@@ -351,13 +357,17 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
         self.score = 0
         self.steps = 0
 
-        self.is_alpha = is_alpha
-        self.is_init_sep = True
-        self.my_pos = (0, 0)
-        self.path = None
-        self.wall_pos = [
-            (wall[0] // self.speedx, wall[1] // self.speedy) for wall in get_wall_data()
-        ]
+        self.is_top = is_top
+        self.my_pos: tuple[int, int] = (0, 0)
+        self.path: list[tuple[int, int]]= []
+
+        if self.is_top:
+            PlayerHybridPartPath.wall_pos = [
+                (wall[0] // self.speedx, wall[1] // self.speedy) for wall in get_wall_data()
+            ]
+
+            coin_vals, coin_pos = get_coin_data()
+            
 
     def move(self, direction):
         """Translate movement intention into a change in position."""
@@ -409,64 +419,79 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
 
     def update(self):
         """Implement agent's hybrid logic."""
-        if self.is_init_sep:
-            match self.is_alpha:
-                case True if self.rect.x / WIDTH < 0.5:
-                    self.move(Movement.RIGHT)
-                    return
-                case True:
-                    self.is_init_sep = False
-                case False if self.rect.y / HEIGHT < 0.5:
-                    self.move(Movement.DOWN)
-                    return
-                case False:
-                    self.is_init_sep = False
+        # initial separation
+        if not self.is_top and self.rect.y / HEIGHT > 0.5:
+            PlayerHybridPartPath.is_init_sep = False
 
+        # update my_pos
         self.my_pos = (self.rect.x // self.speedx, self.rect.y // self.speedy)
 
         coin_vals, coin_pos = get_coin_data()
-        self.coin_pos = []
+        self.coin_pos: list[tuple[int, int]] = []
+        self.coin_dists: list[tuple[float, int, tuple[int, int]]] = []
         for c_val, c_loc in zip(coin_vals, coin_pos):
-            if self.is_alpha and c_loc[1] / HEIGHT < 0.5:
-                self.coin_pos.append((c_loc[0] // self.speedx, c_loc[1] //self.speedy))
-            elif not self.is_alpha and c_loc[1] / HEIGHT > 0.5:
-                self.coin_pos.append((c_loc[0] // self.speedx, c_loc[1] //self.speedy))
+            if self.is_top and c_loc[1] / HEIGHT > 0.5:
+                continue
+            elif not self.is_top and c_loc[1] / HEIGHT < 0.5:
+                continue
 
-        if not self.path or self.path[0] not in self.coin_pos:
-            visited, next_pos = self.find_path()
+            c_pos = (c_loc[0] // self.speedx, c_loc[1] // self.speedy)
+            c_dist = get_distance(self.my_pos, c_pos, "m")
+            self.coin_pos.append(c_pos)
+
+            # Fancy
+            # heapq.heappush(
+            #    self.coin_dists,
+            #    (c_dist / (c_val+c_val), c_dist, c_pos)
+            # )
+
+            # By value, distance
+            # heapq.heappush(
+            #     self.coin_dists,
+            #     (9-c_val, c_dist, c_pos)
+            # )
+
+            # By distance, value
+            heapq.heappush(self.coin_dists, (c_dist, 9 - c_val, c_pos))
+
+        if not self.coin_dists or not self.coin_pos:
+            return
+        if not self.path and self.coin_pos:
+            goal = heapq.heappop(self.coin_dists)
+            visited, next_pos = self.find_path(goal[0], goal[2])
 
             self.path = [next_pos]
             while next_pos != self.my_pos:
                 next_pos = visited[next_pos]
                 self.path.append(next_pos)
 
+        while self.path and self.coin_pos:
+            cmp_pos = self.path.pop()
+            rel_x = cmp_pos[0] - self.my_pos[0]
+            rel_y = cmp_pos[1] - self.my_pos[1]
+            match (rel_x, rel_y):
+                case (1, 0):
+                    self.move(Movement.RIGHT)
+                case (-1, 0):
+                    self.move(Movement.LEFT)
+                case (0, 1):
+                    self.move(Movement.DOWN)
+                case (0, -1):
+                    self.move(Movement.UP)
 
-        cmp_pos = self.path.pop()
-        rel_x = cmp_pos[0] - self.my_pos[0]
-        rel_y = cmp_pos[1] - self.my_pos[1]
-        match (rel_x, rel_y):
-            case (1, 0):
-                self.move(Movement.RIGHT)
-            case (-1, 0):
-                self.move(Movement.LEFT)
-            case (0, 1):
-                self.move(Movement.DOWN)
-            case (0, -1):
-                self.move(Movement.UP)
+            if self.is_top:
+                PlayerHybridPartPath.p_top_pos = self.my_pos
+            else:
+                PlayerHybridPartPath.p_bot_pos = self.my_pos
 
-        if self.is_alpha:
-            PlayerHybridPartPath.p_top_pos = self.my_pos
-        else:
-            PlayerHybridPartPath.p_bot_pos = self.my_pos
-
-
-    def find_path(self):
-        frontier = []
-        visited = {}
-
+    def find_path(self, dist: float, goal: tuple[int, int]) -> tuple[dict[tuple[int, int], tuple[int, int]], tuple[int, int]]:
+        """Return path via modified Astar."""
         # frontier: (priority, current_pos, prev_pos)
+        frontier: list[tuple[int, tuple[int, int], tuple[int, int]]] = []
+        visited: dict[tuple[int, int], tuple[int, int]] = {}
+
         heapq.heappush(frontier, (0, self.my_pos, self.my_pos))
-        # Get the path to the closest coin
+        # Get the path to the coin
         while frontier:
             current = heapq.heappop(frontier)
 
@@ -475,16 +500,26 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
                     current[1][0] + mov_dir.value[0],
                     current[1][1] + mov_dir.value[1],
                 )
-                if -1 in next_pos:
+                if self.is_init_sep and get_distance(next_pos, goal, "m") > dist + 1:
                     continue
-                if next_pos[0] > WIDTH // self.speedx or next_pos[1] > HEIGHT // self.speedy:
+                if get_distance(next_pos, goal, "m") > dist + 3:
+                    continue
+
+                if (
+                    -1 in next_pos
+                    or next_pos[0] > WIDTH // self.speedx
+                    or next_pos[1] > HEIGHT // self.speedy
+                ):
                     continue
 
                 if next_pos in visited.values():
                     continue
                 if next_pos in self.wall_pos:
                     continue
-                if next_pos in self.coin_pos:
+                if next_pos == goal:
+                    visited[next_pos] = current[1]
+                    return visited, next_pos
+                if current[0] == 10:
                     visited[next_pos] = current[1]
                     return visited, next_pos
 
