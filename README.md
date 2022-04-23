@@ -2,19 +2,72 @@
 
 ## Usage
 
-To run the simulation:
+### Simulation:
+
+`python main.py`
+
+### Simulation Example:
 
 ```bash
-python main.py
+$ python main.py
+pygame 2.1.2 (SDL 2.0.16, Python 3.10.3)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+Score of Player 1: 189
+Score of Player 2: 199
+Total Score: 388
 ```
 
-To benchmark:
+### Benchmark:
+
+`python benchmark.py -r N`
+
+- where `N` is the number of runs.
+
+### Benchmark Example:
 
 ```bash
-python benchmark.py -r N
-```
+$ python benchmark.py -r 5
+Run 1 of 5:
+  Player 1: 189
+  Player 2: 199
+  Total: 388
+Run 2 of 5:
+  Player 1: 183
+  Player 2: 195
+  Total: 378
+Run 3 of 5:
+  Player 1: 189
+  Player 2: 199
+  Total: 388
+Run 4 of 5:
+  Player 1: 189
+  Player 2: 199
+  Total: 388
+Run 5 of 5:
+  Player 1: 189
+  Player 2: 199
+  Total: 388
 
-where N is the number of runs.
+Summary:
+Player 1 Scores:
+  Scores: [189, 183, 189, 189, 189]
+  Sorted: [183, 189, 189, 189, 189]
+  Mean: 187.8
+  Median: 189
+  Std Dev: 2.6832815729997477
+Player 2 Scores:
+  Scores: [199, 195, 199, 199, 199]
+  Sorted: [195, 199, 199, 199, 199]
+  Mean: 198.2
+  Median: 199
+  Std Dev: 1.7888543819998317
+Total Scores:
+  Scores: [388, 378, 388, 388, 388]
+  Sorted: [378, 388, 388, 388, 388]
+  Mean: 386
+  Median: 388
+  Std Dev: 4.47213595499958
+```
 
 ## Description
 
