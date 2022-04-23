@@ -43,6 +43,7 @@ def get_distance(a: tuple[int, int], b: tuple[int, int], m_type: str) -> float:
             return abs(a[0] - b[0]) + abs(a[1] - b[1])
     return -1
 
+
 class PlayerReactivePartJiggle(pygame.sprite.Sprite):
     """Defines a Reactive, Partitioned, Jiggly agent.
 
@@ -216,13 +217,14 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
 
         self.is_top = is_top
         self.my_pos: tuple[int, int] = (0, 0)
-        self.path: list[tuple[int, int]]= []
+        self.path: list[tuple[int, int]] = []
 
         if self.is_top:
             PlayerHybridPartPath.HALF_HEIGHT = (HEIGHT // self.speedy) // 2
             PlayerHybridPartPath.HALF_WIDTH = (WIDTH // self.speedx) // 2
             PlayerHybridPartPath.wall_pos = [
-                (wall[0] // self.speedx, wall[1] // self.speedy) for wall in get_wall_data()
+                (wall[0] // self.speedx, wall[1] // self.speedy)
+                for wall in get_wall_data()
             ]
 
     def _is_move_blocked(self, mov_dir: Movement) -> bool:
@@ -243,7 +245,6 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
             pos = (c_loc[0] // self.speedx, c_loc[1] // self.speedy)
             coins[pos] = c_val
         return coins
-
 
     def move(self, direction):
         """Translate movement intention into a change in position."""
@@ -298,12 +299,19 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
         # calculate agent's coin queue
         self.coin_queue: list[tuple[float, int, tuple[int, int]]] = []
         for c_loc, c_val in PlayerHybridPartPath.coin_dict.items():
-            match (self.is_top, PlayerHybridPartPath.is_init_sep, c_loc[1] > PlayerHybridPartPath.HALF_HEIGHT):
+            match (
+                self.is_top,
+                PlayerHybridPartPath.is_init_sep,
+                c_loc[1] > PlayerHybridPartPath.HALF_HEIGHT,
+            ):
                 case (True, _, True):
                     continue
                 case (True, True, False) if c_loc[0] < PlayerHybridPartPath.HALF_WIDTH:
                     continue
-                case (False, True, False) if c_loc[0] > PlayerHybridPartPath.HALF_WIDTH or c_loc[1] < self.my_pos[1]:
+                case (False, True, False) if (
+                    c_loc[0] > PlayerHybridPartPath.HALF_WIDTH
+                    or c_loc[1] < self.my_pos[1]
+                ):
                     continue
                 case (False, False, False):
                     continue
@@ -317,10 +325,10 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
             # )
 
             # By value, distance
-            #    heapq.heappush(
-            #        self.coin_queue,
-            #        (9-c_val, c_dist, c_loc)
-            #    )
+            # heapq.heappush(
+            #     self.coin_queue,
+            #     (9-c_val, c_dist, c_loc)
+            # )
 
             # By distance, value
             heapq.heappush(self.coin_queue, (c_dist, 9 - c_val, c_loc))
@@ -337,7 +345,11 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
             self.path.append(next_pos)
 
         while self.path and PlayerHybridPartPath.coin_dict[goal[2]]:
-            if self.is_top and PlayerHybridPartPath.is_init_sep and get_distance(self.my_pos, PlayerHybridPartPath.p_bot_pos, "m") < 2:
+            if (
+                self.is_top
+                and PlayerHybridPartPath.is_init_sep
+                and get_distance(self.my_pos, PlayerHybridPartPath.p_bot_pos, "m") < 2
+            ):
                 break
 
             cmp_pos = self.path.pop()
@@ -359,7 +371,9 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
             else:
                 PlayerHybridPartPath.p_bot_pos = self.my_pos
 
-    def find_path(self, dist: float, goal: tuple[int, int]) -> tuple[dict[tuple[int, int], tuple[int, int]], tuple[int, int]]:
+    def find_path(
+        self, dist: float, goal: tuple[int, int]
+    ) -> tuple[dict[tuple[int, int], tuple[int, int]], tuple[int, int]]:
         """Return path via modified Astar."""
         # frontier: (priority, current_pos, prev_pos)
         frontier: list[tuple[int, tuple[int, int], tuple[int, int]]] = []
@@ -380,7 +394,11 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
 
                 if self.is_top and next_pos[1] > PlayerHybridPartPath.HALF_HEIGHT:
                     continue
-                elif not PlayerHybridPartPath.is_init_sep and not self.is_top and next_pos[1] <= PlayerHybridPartPath.HALF_HEIGHT:
+                elif (
+                    not PlayerHybridPartPath.is_init_sep
+                    and not self.is_top
+                    and next_pos[1] <= PlayerHybridPartPath.HALF_HEIGHT
+                ):
                     continue
 
                 if (
@@ -420,6 +438,8 @@ class PlayerA(PlayerHybridPartPath):
     def __init__(self):
         """Passthrough initialization."""
         super().__init__(True)
+
+
 class PlayerB(PlayerHybridPartPath):
     """Convenience class used as an alias for compatability."""
 
