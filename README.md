@@ -2,11 +2,11 @@
 
 ## Usage
 
-### Simulation:
+### Simulation
 
 `python main.py`
 
-### Simulation Example:
+### Simulation Example
 
 ```bash
 $ python main.py
@@ -17,13 +17,13 @@ Score of Player 2: 199
 Total Score: 388
 ```
 
-### Benchmark:
+### Benchmark
 
 `python benchmark.py -r N`
 
 - where `N` is the number of runs.
 
-### Benchmark Example:
+### Benchmark Example
 
 ```bash
 $ python benchmark.py -r 5
