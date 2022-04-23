@@ -54,19 +54,19 @@ Player 1 Scores:
   Sorted: [183, 189, 189, 189, 189]
   Mean: 187.8
   Median: 189
-  Std Dev: 2.6832815729997477
+  Std Dev: 2.68
 Player 2 Scores:
   Scores: [199, 195, 199, 199, 199]
   Sorted: [195, 199, 199, 199, 199]
   Mean: 198.2
   Median: 199
-  Std Dev: 1.7888543819998317
+  Std Dev: 1.78
 Total Scores:
   Scores: [388, 378, 388, 388, 388]
   Sorted: [378, 388, 388, 388, 388]
   Mean: 386
   Median: 388
-  Std Dev: 4.47213595499958
+  Std Dev: 4.47
 ```
 
 ## Description
