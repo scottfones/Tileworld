@@ -415,8 +415,14 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
 
 
 class PlayerA(PlayerHybridPartPath):
+    """Convenience class used as an alias for compatability."""
+
     def __init__(self):
+        """Passthrough initialization."""
         super().__init__(True)
 class PlayerB(PlayerHybridPartPath):
+    """Convenience class used as an alias for compatability."""
+
     def __init__(self):
+        """Passthrough initialization."""
         super().__init__(False)
