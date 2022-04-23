@@ -137,3 +137,7 @@ Aliases for PlayerA and PlayerB classes were implemented for compatibility.
 PlayerA = PlayerHybridPartPath(true)
 PlayerB = PlayerHybridPartPath(false)
 ```
+
+## Sources
+
+Sonic Image: <https://www.pngegg.com/en/png-yovsd>
