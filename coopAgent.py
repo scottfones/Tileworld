@@ -187,7 +187,6 @@ def get_distance(a: tuple[int, int], b: tuple[int, int], m_type: str) -> float:
             return abs(a[0] - b[0]) + abs(a[1] - b[1])
     return -1
 
-
 class PlayerReactivePartJiggle(pygame.sprite.Sprite):
     """Defines a Reactive, Partitioned, Jiggly agent.
 
@@ -332,12 +331,14 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
     The agent uses a pathfinding algorithm to move to the closest coin.
     """
 
-    is_init_sep: bool = True
+    HALF_HEIGHT: int
+    HALF_WIDTH: int
 
+    is_init_sep: bool = True
     p_top_pos: tuple[int, int] = (-1, -1)
     p_bot_pos: tuple[int, int] = (-1, -1)
 
-    coin_pos: list[tuple[int, int]] = []
+    coin_dict: dict[tuple[int, int], int]
     wall_pos: list[tuple[int, int]]
 
     def __init__(self, is_top: bool):
@@ -362,12 +363,32 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
         self.path: list[tuple[int, int]]= []
 
         if self.is_top:
+            PlayerHybridPartPath.HALF_HEIGHT = (HEIGHT // self.speedy) // 2
+            PlayerHybridPartPath.HALF_WIDTH = (WIDTH // self.speedx) // 2
+            print(self.HALF_WIDTH)
             PlayerHybridPartPath.wall_pos = [
                 (wall[0] // self.speedx, wall[1] // self.speedy) for wall in get_wall_data()
             ]
 
-            coin_vals, coin_pos = get_coin_data()
-            
+    def _is_move_blocked(self, mov_dir: Movement) -> bool:
+        """Determine if a movement would be blocked."""
+        next_pos = (
+            self.my_pos[0] + mov_dir.value[0],
+            self.my_pos[1] + mov_dir.value[1],
+        )
+        if next_pos in self.wall_pos:
+            return True
+        return False
+
+    def _translate_coins(self) -> dict[tuple[int, int], int]:
+        """Convert coin data into a dictionary, location -> value."""
+        coins: dict[tuple[int, int], int] = {}
+        coin_values, coin_locs = get_coin_data()
+        for c_val, c_loc in zip(coin_values, coin_locs):
+            pos = (c_loc[0] // self.speedx, c_loc[1] // self.speedy)
+            coins[pos] = c_val
+        return coins
+
 
     def move(self, direction):
         """Translate movement intention into a change in position."""
@@ -407,37 +428,32 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
                 return True
         return False
 
-    def _is_move_blocked(self, mov_dir: Movement) -> bool:
-        """Determine if a movement would be blocked."""
-        next_pos = (
-            self.my_pos[0] + mov_dir.value[0],
-            self.my_pos[1] + mov_dir.value[1],
-        )
-        if next_pos in self.wall_pos:
-            return True
-        return False
-
     def update(self):
         """Implement agent's hybrid logic."""
         # initial separation
-        if not self.is_top and self.rect.y / HEIGHT > 0.5:
+        if not self.is_top and self.my_pos[1] > PlayerHybridPartPath.HALF_HEIGHT:
             PlayerHybridPartPath.is_init_sep = False
+
+        if self.is_top:
+            PlayerHybridPartPath.coin_dict = self._translate_coins()
 
         # update my_pos
         self.my_pos = (self.rect.x // self.speedx, self.rect.y // self.speedy)
 
-        coin_vals, coin_pos = get_coin_data()
-        self.coin_pos: list[tuple[int, int]] = []
-        self.coin_dists: list[tuple[float, int, tuple[int, int]]] = []
-        for c_val, c_loc in zip(coin_vals, coin_pos):
-            if self.is_top and c_loc[1] / HEIGHT > 0.5:
-                continue
-            elif not self.is_top and c_loc[1] / HEIGHT < 0.5:
-                continue
+        # calculate agent's coin queue
+        self.coin_queue: list[tuple[float, int, tuple[int, int]]] = []
+        for c_loc, c_val in PlayerHybridPartPath.coin_dict.items():
+            match (self.is_top, PlayerHybridPartPath.is_init_sep, c_loc[1] > PlayerHybridPartPath.HALF_HEIGHT):
+                case (True, _, True):
+                    continue
+                case (True, True, False) if c_loc[0] < PlayerHybridPartPath.HALF_WIDTH:
+                    continue
+                case (False, True, False) if c_loc[0] > PlayerHybridPartPath.HALF_WIDTH or c_loc[1] < self.my_pos[1]:
+                    continue
+                case (False, False, False):
+                    continue
 
-            c_pos = (c_loc[0] // self.speedx, c_loc[1] // self.speedy)
-            c_dist = get_distance(self.my_pos, c_pos, "m")
-            self.coin_pos.append(c_pos)
+            c_dist = get_distance(self.my_pos, c_loc, "m")
 
             # Fancy
             # heapq.heappush(
@@ -446,26 +462,29 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
             # )
 
             # By value, distance
-            # heapq.heappush(
-            #     self.coin_dists,
-            #     (9-c_val, c_dist, c_pos)
-            # )
+            #    heapq.heappush(
+            #        self.coin_queue,
+            #        (9-c_val, c_dist, c_loc)
+            #    )
 
             # By distance, value
-            heapq.heappush(self.coin_dists, (c_dist, 9 - c_val, c_pos))
+            heapq.heappush(self.coin_queue, (c_dist, 9 - c_val, c_loc))
 
-        if not self.coin_dists or not self.coin_pos:
+        if not self.coin_queue:
             return
-        if not self.path and self.coin_pos:
-            goal = heapq.heappop(self.coin_dists)
-            visited, next_pos = self.find_path(goal[0], goal[2])
 
-            self.path = [next_pos]
-            while next_pos != self.my_pos:
-                next_pos = visited[next_pos]
-                self.path.append(next_pos)
+        goal = heapq.heappop(self.coin_queue)
+        visited, next_pos = self.find_path(goal[0], goal[2])
 
-        while self.path and self.coin_pos:
+        self.path = [next_pos]
+        while next_pos != self.my_pos:
+            next_pos = visited[next_pos]
+            self.path.append(next_pos)
+
+        while self.path and PlayerHybridPartPath.coin_dict[goal[2]]:
+            if self.is_top and PlayerHybridPartPath.is_init_sep and get_distance(self.my_pos, PlayerHybridPartPath.p_bot_pos, "m") < 2:
+                break
+
             cmp_pos = self.path.pop()
             rel_x = cmp_pos[0] - self.my_pos[0]
             rel_y = cmp_pos[1] - self.my_pos[1]
@@ -481,6 +500,7 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
 
             if self.is_top:
                 PlayerHybridPartPath.p_top_pos = self.my_pos
+                self._translate_coins()
             else:
                 PlayerHybridPartPath.p_bot_pos = self.my_pos
 
@@ -500,9 +520,12 @@ class PlayerHybridPartPath(pygame.sprite.Sprite):
                     current[1][0] + mov_dir.value[0],
                     current[1][1] + mov_dir.value[1],
                 )
-                if self.is_init_sep and get_distance(next_pos, goal, "m") > dist + 1:
-                    continue
                 if get_distance(next_pos, goal, "m") > dist + 3:
+                    continue
+
+                if self.is_top and next_pos[1] > PlayerHybridPartPath.HALF_HEIGHT:
+                    continue
+                elif not PlayerHybridPartPath.is_init_sep and not self.is_top and next_pos[1] <= PlayerHybridPartPath.HALF_HEIGHT:
                     continue
 
                 if (
